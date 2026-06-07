@@ -1,0 +1,193 @@
+# =============================================================================
+# web-service — default values
+# =============================================================================
+# A single stateless HTTP Deployment + Service + Ingress. Use it for:
+#   - static / SPA sites served by nginx (port 8080, readOnlyRootFilesystem)
+#   - API services such as FastAPI/uvicorn (port 8000, env + secrets)
+# See examples/ for a fleshed-out values file per archetype.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Naming — both default to the Helm release name.
+# -----------------------------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""
+
+# -----------------------------------------------------------------------------
+# Image
+# -----------------------------------------------------------------------------
+image:
+  repository: ghcr.io/example/app
+  # Empty tag → falls back to .Chart.AppVersion. Bump the chart version per
+  # release for a clean audit trail of "what's deployed".
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+# Override the image's default entrypoint/cmd. Leave empty to use the image's.
+command: []
+args: []
+
+replicas: 2
+
+# Port the container listens on. Referenced by the Service, probes (port: http),
+# and Ingress. nginx-unprivileged → 8080, uvicorn → 8000.
+port: 8080
+
+# -----------------------------------------------------------------------------
+# Config & secrets
+# -----------------------------------------------------------------------------
+# `env` becomes a ConfigMap mounted via envFrom. Keep non-secret values here.
+# Static sites usually leave this empty.
+env: {}
+  # APP_ENV: production
+
+# Existing Secrets in the same namespace, mounted via envFrom (typically managed
+# via SealedSecrets / external-secrets — never templated by this chart).
+envFromSecret: []
+  # - name: my-app-secrets
+
+# Existing ConfigMaps in the same namespace, mounted via envFrom in addition to
+# the chart's own ConfigMap.
+envFromConfigMap: []
+  # - name: shared-platform-config
+
+# Inject SENTRY_RELEASE = image tag (or chart appVersion) automatically.
+sentry:
+  injectRelease: false
+
+# -----------------------------------------------------------------------------
+# Security
+# -----------------------------------------------------------------------------
+# No runAsUser is forced — the image's USER is honored (nginx-unprivileged uses
+# 101, the FastAPI image uses 10001). Set it here only if you need to override.
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  # Flip to true for static nginx sites and mount the writable dirs nginx needs
+  # via extraVolumes/extraVolumeMounts (see examples/static-site.yaml).
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+serviceAccount:
+  create: true
+  name: ""  # default: release name
+  automountServiceAccountToken: false
+
+# -----------------------------------------------------------------------------
+# Extra volumes — e.g. emptyDir mounts so nginx can run readOnlyRootFilesystem.
+# -----------------------------------------------------------------------------
+extraVolumes: []
+  # - name: tmp
+  #   emptyDir: {}
+extraVolumeMounts: []
+  # - name: tmp
+  #   mountPath: /tmp
+
+# -----------------------------------------------------------------------------
+# Probes — default to an HTTP GET on the container port. Set readinessProbe to
+# null/false to omit it. Static sites often probe "/", APIs "/healthz".
+# -----------------------------------------------------------------------------
+livenessProbe:
+  httpGet: { path: /, port: http }
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 3
+  failureThreshold: 3
+readinessProbe:
+  httpGet: { path: /, port: http }
+  initialDelaySeconds: 3
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Sleep on SIGTERM so Traefik can deregister the endpoint before the container
+# stops, avoiding 502s mid-rollout.
+preStop:
+  enabled: true
+  sleepSeconds: 5
+
+terminationGracePeriodSeconds: 30
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# -----------------------------------------------------------------------------
+# Scheduling
+# -----------------------------------------------------------------------------
+# Spread replicas across nodes (soft constraint so single-node still schedules).
+topologySpread:
+  enabled: true
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: ScheduleAnyway
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# How many old ReplicaSets to keep.
+revisionHistoryLimit: 3
+
+# -----------------------------------------------------------------------------
+# Service
+# -----------------------------------------------------------------------------
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+  # Defaults to .Values.port when empty.
+  targetPort: ""
+
+# -----------------------------------------------------------------------------
+# Autoscaling (off by default). When enabled, replicas is ignored.
+# -----------------------------------------------------------------------------
+hpa:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 4
+  cpuTargetPercent: 70
+  memoryTargetPercent: 0   # 0 → metric omitted
+
+# -----------------------------------------------------------------------------
+# PodDisruptionBudget (only created when replicas > 1)
+# -----------------------------------------------------------------------------
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# -----------------------------------------------------------------------------
+# Ingress (Traefik + cert-manager)
+# -----------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: traefik
+  certIssuer: letsencrypt-prod
+  # All hostnames share one cert. Add www.* variants here too if you want the
+  # redirect middleware to handle them — see redirectWwwToNonWww below.
+  hosts:
+    - example.com
+  # Override secretName if you need to share a cert across releases.
+  tlsSecretName: ""
+  # Adds a Traefik Middleware that 301s www.* → non-www. Requires the www
+  # hostnames to also be listed in `hosts` for a valid TLS handshake.
+  redirectWwwToNonWww: false
+  # Extra annotations merged onto the Ingress resource.
+  annotations: {}
+  path: /
+  pathType: Prefix

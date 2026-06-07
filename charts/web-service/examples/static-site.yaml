@@ -1,0 +1,70 @@
+# Example: a static / SPA site served by nginx-unprivileged (e.g. portfolio).
+# Install:
+#   helm upgrade --install portfolio ./charts/web-service \
+#     -n portfolio --create-namespace -f static-site.yaml
+
+image:
+  repository: ghcr.io/danielvdspoel/portfolio
+  tag: ""            # set per release, or leave empty to track chart appVersion
+
+replicas: 2
+port: 8080           # nginx-unprivileged listens on 8080
+
+# Static assets are read-only — lock the root filesystem and give nginx the few
+# writable dirs it needs as emptyDirs.
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+  seccompProfile:
+    type: RuntimeDefault
+
+extraVolumes:
+  - name: tmp
+    emptyDir: {}
+  - name: var-cache-nginx
+    emptyDir: {}
+  - name: var-run
+    emptyDir: {}
+extraVolumeMounts:
+  - name: tmp
+    mountPath: /tmp
+  - name: var-cache-nginx
+    mountPath: /var/cache/nginx
+  - name: var-run
+    mountPath: /var/run
+
+livenessProbe:
+  httpGet: { path: /health, port: http }
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+readinessProbe:
+  httpGet: { path: /health, port: http }
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi
+
+service:
+  port: 80
+  targetPort: 8080
+
+ingress:
+  hosts:
+    - danielvdspoel.com
+    - www.danielvdspoel.com
+    - danielvdspoel.nl
+    - www.danielvdspoel.nl
+  redirectWwwToNonWww: true

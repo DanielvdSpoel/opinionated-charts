@@ -1,0 +1,60 @@
+# Example: a FastAPI / uvicorn API service (e.g. the BudgetBunny ML service).
+# Install:
+#   helm upgrade --install ml ./charts/web-service \
+#     -n budgetbunny --create-namespace -f fastapi.yaml
+
+image:
+  repository: ghcr.io/danielvdspoel/budgetbunny-ml
+  tag: ""
+
+# The image already CMDs uvicorn; override here only if you need extra flags.
+# command: ["uvicorn"]
+# args: ["src.core.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+
+replicas: 2
+port: 8000           # uvicorn
+
+# Non-secret config → ConfigMap.
+env:
+  APP_ENV: production
+  LOG_LEVEL: info
+
+# DB / model credentials live in an existing (Sealed)Secret in the namespace.
+envFromSecret:
+  - name: ml-secrets
+
+livenessProbe:
+  httpGet: { path: /healthz, port: http }
+  initialDelaySeconds: 20
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+readinessProbe:
+  httpGet: { path: /healthz, port: http }
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Inference is CPU-bound — autoscale on CPU.
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  cpuTargetPercent: 70
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+service:
+  port: 80
+  targetPort: 8000
+
+ingress:
+  hosts:
+    - ml.budgetbunny.app

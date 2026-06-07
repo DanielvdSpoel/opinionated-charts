@@ -12,10 +12,10 @@ versioned independently via its own `Chart.yaml`.
 | Chart | Purpose | Used by |
 |-------|---------|---------|
 | [`laravel-app`](charts/laravel-app) | Laravel: web + queue worker + scheduler | budgetbuddy, kwekerijvh |
+| [`web-service`](charts/web-service) | Single stateless HTTP service — nginx static/SPA sites and API services (FastAPI/uvicorn, etc.) | portfolio, opruim-coach, budgetbunny-ml |
 
-> Planned: `web-service` — a generic stateless HTTP chart covering FastAPI
-> services and standalone static/SPA sites (portfolio, opruim-coach). This is
-> where frontends live now — the Laravel chart no longer bundles one.
+Frontends and standalone services live in `web-service` — the Laravel chart no
+longer bundles a frontend.
 
 ## Usage
 

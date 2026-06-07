@@ -1,0 +1,22 @@
+{{ .Chart.Name }} {{ .Chart.Version }} (app version {{ .Chart.AppVersion }}) installed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Image: {{ include "web-service.image" . }}
+Replicas: {{ if .Values.hpa.enabled }}{{ .Values.hpa.minReplicas }}–{{ .Values.hpa.maxReplicas }} (HPA){{ else }}{{ .Values.replicas }}{{ end }}
+
+{{- if and .Values.ingress.enabled (gt (len .Values.ingress.hosts) 0) }}
+
+Routes:
+{{- range .Values.ingress.hosts }}
+  https://{{ . }}
+{{- end }}
+{{- end }}
+
+Quick checks:
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+  kubectl -n {{ .Release.Namespace }} logs -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=web --tail=50
+  helm -n {{ .Release.Namespace }} status {{ .Release.Name }}
+{{- if .Values.envFromSecret }}
+
+Reminder: this chart references existing Secrets by name only. If you haven't applied
+your SealedSecret(s) yet, the pods will CrashLoopBackOff with "secret not found".
+{{- end }}

@@ -1,0 +1,20 @@
+apiVersion: v2
+name: web-service
+description: Opinionated Helm chart for a single stateless HTTP service on Kubernetes — covers nginx static/SPA sites and API services (FastAPI/uvicorn, Node, etc.) with Traefik ingress + cert-manager.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - web
+  - http
+  - nginx
+  - fastapi
+  - static
+  - spa
+  - traefik
+home: https://github.com/DanielvdSpoel/opinionated-charts/tree/master/charts/web-service
+sources:
+  - https://github.com/DanielvdSpoel/opinionated-charts
+maintainers:
+  - name: Daniel van der Spoel
+    email: contact@danielvdspoel.nl
