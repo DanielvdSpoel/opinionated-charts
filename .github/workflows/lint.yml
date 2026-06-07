@@ -1,0 +1,53 @@
+name: Lint charts
+
+on:
+  pull_request:
+    paths:
+      - 'charts/**'
+      - '.github/workflows/lint.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'charts/**'
+      - '.github/workflows/lint.yml'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: helm lint
+        run: |
+          for dir in charts/*/; do
+            echo "::group::helm lint $dir"
+            helm lint "$dir"
+            echo "::endgroup::"
+          done
+
+      - name: Install kubeconform
+        run: |
+          curl -sSLo kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz kubeconform
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Render and validate manifests
+        run: |
+          # Validate rendered output against the Kubernetes API schemas.
+          # -ignore-missing-schemas skips CRDs we don't ship (Traefik Middleware).
+          validate() {
+            echo "::group::validate $*"
+            helm template "$@" \
+              | kubeconform -strict -summary -ignore-missing-schemas \
+                  -kubernetes-version 1.30.0
+            echo "::endgroup::"
+          }
+          validate release charts/laravel-app
+          validate release charts/web-service
+          validate release charts/web-service -f charts/web-service/examples/static-site.yaml
+          validate release charts/web-service -f charts/web-service/examples/fastapi.yaml
