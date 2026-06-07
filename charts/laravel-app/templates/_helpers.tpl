@@ -57,14 +57,6 @@ Image reference for the main app image.
 {{- end -}}
 
 {{/*
-Image reference for the frontend image.
-*/}}
-{{- define "laravel-app.frontendImage" -}}
-{{- $tag := default .Chart.AppVersion .Values.frontend.image.tag -}}
-{{- printf "%s:%s" .Values.frontend.image.repository $tag -}}
-{{- end -}}
-
-{{/*
 ServiceAccount name to use.
 */}}
 {{- define "laravel-app.serviceAccountName" -}}

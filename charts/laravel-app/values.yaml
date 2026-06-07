@@ -206,49 +206,6 @@ scheduler:
   affinity: {}
 
 # -----------------------------------------------------------------------------
-# Frontend role — separate static SPA deployment (e.g. Vue + nginx)
-# -----------------------------------------------------------------------------
-frontend:
-  enabled: false
-  replicas: 2
-  image:
-    repository: ""
-    tag: ""           # falls back to .Chart.AppVersion
-    pullPolicy: IfNotPresent
-  port: 80
-  resources:
-    requests:
-      cpu: 25m
-      memory: 32Mi
-    limits:
-      cpu: 100m
-      memory: 64Mi
-  livenessProbe:
-    httpGet: { path: /, port: 80 }
-    initialDelaySeconds: 10
-    periodSeconds: 30
-  readinessProbe:
-    httpGet: { path: /, port: 80 }
-    initialDelaySeconds: 3
-    periodSeconds: 10
-  preStop:
-    enabled: true
-    sleepSeconds: 5
-  service:
-    enabled: true
-    type: ClusterIP
-    port: 80
-    targetPort: 80
-  pdb:
-    enabled: true
-    minAvailable: 1
-  hpa:
-    enabled: false
-    minReplicas: 2
-    maxReplicas: 4
-    cpuTargetPercent: 70
-
-# -----------------------------------------------------------------------------
 # Ingress (Traefik + cert-manager)
 # -----------------------------------------------------------------------------
 ingress:
@@ -270,7 +227,3 @@ ingress:
   # Path defaults to "/" with Prefix matching. Override if you need to split.
   path: /
   pathType: Prefix
-  # Routes the frontend on a separate hostname when frontend.enabled = true.
-  # Leave empty to skip frontend ingress (useful when frontend is served via
-  # the API ingress or hosted elsewhere).
-  frontendHosts: []

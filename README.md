@@ -11,10 +11,11 @@ versioned independently via its own `Chart.yaml`.
 
 | Chart | Purpose | Used by |
 |-------|---------|---------|
-| [`laravel-app`](charts/laravel-app) | Laravel: web + queue worker + scheduler, optional bundled Vue/SPA frontend | budgetbuddy, kwekerijvh |
+| [`laravel-app`](charts/laravel-app) | Laravel: web + queue worker + scheduler | budgetbuddy, kwekerijvh |
 
 > Planned: `web-service` — a generic stateless HTTP chart covering FastAPI
-> services and standalone static/SPA sites (portfolio, opruim-coach).
+> services and standalone static/SPA sites (portfolio, opruim-coach). This is
+> where frontends live now — the Laravel chart no longer bundles one.
 
 ## Usage
 

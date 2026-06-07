@@ -1,13 +1,12 @@
 apiVersion: v2
 name: laravel-app
-description: Opinionated Helm chart for Laravel apps on Kubernetes — web + queue worker + scheduler, optional Vue/SPA frontend, Traefik ingress with cert-manager, designed for serversideup-style PHP images.
+description: Opinionated Helm chart for Laravel apps on Kubernetes — web + queue worker + scheduler, Traefik ingress with cert-manager, designed for serversideup-style PHP images.
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
 keywords:
   - laravel
   - php
-  - vue
   - traefik
   - cnpg
 home: https://github.com/DanielvdSpoel/opinionated-charts/tree/master/charts/laravel-app

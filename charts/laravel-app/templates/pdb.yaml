@@ -13,19 +13,3 @@ spec:
       {{- include "laravel-app.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: web
 {{- end }}
-{{- if and .Values.frontend.enabled .Values.frontend.pdb.enabled (gt (int .Values.frontend.replicas) 1) }}
----
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: {{ include "laravel-app.fullname" . }}-frontend
-  labels:
-    {{- include "laravel-app.labels" . | nindent 4 }}
-    app.kubernetes.io/component: frontend
-spec:
-  minAvailable: {{ .Values.frontend.pdb.minAvailable }}
-  selector:
-    matchLabels:
-      {{- include "laravel-app.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: frontend
-{{- end }}

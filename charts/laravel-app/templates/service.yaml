@@ -17,23 +17,3 @@ spec:
     {{- include "laravel-app.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: web
 {{- end }}
-{{- if and .Values.frontend.enabled .Values.frontend.service.enabled }}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ include "laravel-app.fullname" . }}-frontend
-  labels:
-    {{- include "laravel-app.labels" . | nindent 4 }}
-    app.kubernetes.io/component: frontend
-spec:
-  type: {{ .Values.frontend.service.type }}
-  ports:
-    - name: http
-      port: {{ .Values.frontend.service.port }}
-      targetPort: {{ .Values.frontend.service.targetPort }}
-      protocol: TCP
-  selector:
-    {{- include "laravel-app.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: frontend
-{{- end }}

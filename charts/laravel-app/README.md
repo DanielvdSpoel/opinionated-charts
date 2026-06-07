@@ -16,8 +16,6 @@ images and a Traefik + cert-manager + CNPG + SealedSecrets stack.
 - **scheduler** Deployment — long-running `schedule:work` (not a CronJob,
   because spawning a fresh pod every minute just to run a 100ms scheduler
   tick is wasteful). Hard-pinned to `replicas: 1` with `strategy: Recreate`.
-- **frontend** Deployment (optional) — separate static SPA deployment for
-  apps with a Vue/React/etc. frontend served by nginx.
 - **Ingress + Traefik Middleware** — multi-host TLS, optional `www.* → non-www`
   redirect.
 - **ConfigMap** with checksum-annotation rolling on change.
@@ -49,13 +47,11 @@ helm install <release> oci://ghcr.io/<owner>/charts/laravel-app \
 Or directly from the source repo:
 
 ```bash
-git clone https://github.com/<owner>/helm-laravel-app.git
-helm install <release> ./helm-laravel-app/helm \
+git clone https://github.com/DanielvdSpoel/opinionated-charts.git
+helm install <release> ./opinionated-charts/charts/laravel-app \
   --namespace <namespace> --create-namespace \
   -f values.yaml
 ```
-
-See `../helm-example/` in this repo for full usage examples.
 
 ## Values
 
@@ -66,7 +62,7 @@ The two most-used groups:
 - `image.repository` / `image.tag` — leave `tag` empty to default to
   `Chart.AppVersion`. Bump the chart version per release for a clean
   audit trail.
-- `web` / `worker` / `scheduler` / `frontend` — per-role config. Each
+- `web` / `worker` / `scheduler` — per-role config. Each
   role inherits `image`, `podSecurityContext`, `containerSecurityContext`,
   `imagePullSecrets`, and the shared ConfigMap automatically.
 

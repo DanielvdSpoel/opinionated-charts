@@ -1,28 +1,17 @@
 {{ .Chart.Name }} {{ .Chart.Version }} (app version {{ .Chart.AppVersion }}) installed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
 
 Image:    {{ include "laravel-app.image" . }}
-{{ if .Values.frontend.enabled -}}
-Frontend: {{ include "laravel-app.frontendImage" . }}
-{{ end }}
 
 Roles:
   web:        {{ if .Values.web.enabled }}{{ .Values.web.replicas }} replica(s){{ else }}disabled{{ end }}
   worker:     {{ if .Values.worker.enabled }}{{ .Values.worker.replicas }} replica(s){{ else }}disabled{{ end }}
   scheduler:  {{ if .Values.scheduler.enabled }}1 replica (forced){{ else }}disabled{{ end }}
-  frontend:   {{ if .Values.frontend.enabled }}{{ .Values.frontend.replicas }} replica(s){{ else }}disabled{{ end }}
 
 {{- if .Values.ingress.enabled }}
 {{- if gt (len .Values.ingress.hosts) 0 }}
 
 Web routes:
 {{- range .Values.ingress.hosts }}
-  https://{{ . }}
-{{- end }}
-{{- end }}
-{{- if and .Values.frontend.enabled (gt (len .Values.ingress.frontendHosts) 0) }}
-
-Frontend routes:
-{{- range .Values.ingress.frontendHosts }}
   https://{{ . }}
 {{- end }}
 {{- end }}
