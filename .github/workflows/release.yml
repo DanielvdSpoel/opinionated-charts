@@ -18,7 +18,7 @@ jobs:
       contents: write   # create release tags
       packages: write   # push OCI charts to ghcr
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: azure/setup-helm@v4
         with:
