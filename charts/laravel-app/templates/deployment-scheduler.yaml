@@ -1,0 +1,3 @@
+{{- if .Values.scheduler.enabled }}
+{{ include "laravel-app.workload" (dict "ctx" . "role" "scheduler") }}
+{{- end }}

@@ -1,0 +1,91 @@
+{{- if .Values.ingress.enabled }}
+{{- $fullname := include "laravel-app.fullname" . -}}
+{{- $tlsSecret := default (printf "%s-tls" $fullname) .Values.ingress.tlsSecretName -}}
+{{- if .Values.ingress.redirectWwwToNonWww }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $fullname }}-redirect-www
+  labels:
+    {{- include "laravel-app.labels" . | nindent 4 }}
+spec:
+  redirectRegex:
+    regex: ^https?://www\.(.*)
+    replacement: https://${1}
+    permanent: true
+---
+{{- end }}
+{{- if and .Values.web.enabled (gt (len .Values.ingress.hosts) 0) }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "laravel-app.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.certIssuer | quote }}
+    {{- if .Values.ingress.redirectWwwToNonWww }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-redirect-www@kubernetescrd" .Release.Namespace $fullname }}
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        {{- range .Values.ingress.hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ $tlsSecret }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: {{ $.Values.ingress.path }}
+            pathType: {{ $.Values.ingress.pathType }}
+            backend:
+              service:
+                name: {{ $fullname }}-web
+                port:
+                  number: {{ $.Values.web.service.port }}
+    {{- end }}
+{{- end }}
+{{- if and .Values.frontend.enabled (gt (len .Values.ingress.frontendHosts) 0) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullname }}-frontend
+  labels:
+    {{- include "laravel-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.certIssuer | quote }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        {{- range .Values.ingress.frontendHosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ $fullname }}-frontend-tls
+  rules:
+    {{- range .Values.ingress.frontendHosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: {{ $.Values.ingress.path }}
+            pathType: {{ $.Values.ingress.pathType }}
+            backend:
+              service:
+                name: {{ $fullname }}-frontend
+                port:
+                  number: {{ $.Values.frontend.service.port }}
+    {{- end }}
+{{- end }}
+{{- end }}

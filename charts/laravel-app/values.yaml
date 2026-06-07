@@ -1,0 +1,276 @@
+# =============================================================================
+# laravel-app — default values
+# =============================================================================
+# This file documents every knob the chart exposes. Override any subset in your
+# own per-app values file (see ../helm-example/).
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Naming
+# -----------------------------------------------------------------------------
+# Both default to the Helm release name. Override only if you want decoupled
+# resource names.
+nameOverride: ""
+fullnameOverride: ""
+
+# -----------------------------------------------------------------------------
+# Image (shared across web/worker/scheduler unless a role overrides)
+# -----------------------------------------------------------------------------
+image:
+  repository: ghcr.io/example/app
+  # Empty tag → falls back to .Chart.AppVersion. Bump the chart version per
+  # release for a clean audit trail of "what's deployed".
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-secret
+
+# -----------------------------------------------------------------------------
+# App-level config & secrets
+# -----------------------------------------------------------------------------
+# `env` becomes a ConfigMap mounted into every role via envFrom. Keep
+# non-secret values here.
+env:
+  APP_ENV: production
+  APP_DEBUG: "false"
+  LOG_CHANNEL: stack
+  LOG_STACK: stderr
+  LOG_STDERR_FORMATTER: Monolog\Formatter\JsonFormatter
+  APP_TIMEZONE: UTC
+
+# References to existing Secrets in the same namespace (typically managed via
+# SealedSecrets / external-secrets — never templated by this chart).
+envFromSecret: []
+  # - name: my-app-secrets
+
+# References to existing ConfigMaps in the same namespace, mounted via envFrom
+# in addition to the chart's own ConfigMap. Useful when platform-wide config
+# lives in a shared CM.
+envFromConfigMap: []
+  # - name: shared-platform-config
+
+# Inject SENTRY_RELEASE = chart appVersion automatically.
+sentry:
+  injectRelease: false
+
+# -----------------------------------------------------------------------------
+# Pod-level defaults (apply to every role unless overridden)
+# -----------------------------------------------------------------------------
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 33   # www-data
+  runAsGroup: 33  # www-data
+  fsGroup: 33
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 33
+  runAsGroup: 33
+
+serviceAccount:
+  create: true
+  name: ""  # default: release name
+  automountServiceAccountToken: false
+
+# Spread replicas across nodes when more than one exists. Soft constraint
+# (ScheduleAnyway) so single-node clusters still schedule.
+topologySpread:
+  enabled: true
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: ScheduleAnyway
+
+# How many old ReplicaSets to keep per Deployment.
+revisionHistoryLimit: 3
+
+# -----------------------------------------------------------------------------
+# Web role — HTTP-serving Laravel pod
+# -----------------------------------------------------------------------------
+web:
+  enabled: true
+  replicas: 2
+  containerRole: app          # CONTAINER_ROLE env (serversideup convention)
+  port: 8080
+  command: []                 # empty → use image's default entrypoint
+  args: []
+  env: {}                     # role-specific extra env
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  livenessProbe:
+    httpGet: { path: /up, port: 8080 }
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  readinessProbe:
+    httpGet: { path: /up, port: 8080 }
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  # Give Traefik (or any LB) time to deregister the endpoint before the pod
+  # exits, preventing dropped in-flight requests on rollout.
+  preStop:
+    enabled: true
+    sleepSeconds: 10
+  terminationGracePeriodSeconds: 30
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  hpa:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    cpuTargetPercent: 70
+    memoryTargetPercent: 0   # 0 disables memory-based scaling
+  pdb:
+    enabled: true
+    minAvailable: 1
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# -----------------------------------------------------------------------------
+# Queue worker role
+# -----------------------------------------------------------------------------
+worker:
+  enabled: true
+  replicas: 1
+  containerRole: worker
+  command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--max-time=3600"]
+  args: []
+  env: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  # No HTTP server → exec probe via pgrep catches hung processes that the
+  # parent PHP shell hasn't noticed.
+  livenessProbe:
+    exec:
+      command: ["pgrep", "-f", "queue:work"]
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe: {}
+  # Match worker --max-time so k8s doesn't SIGKILL mid-job during rollout.
+  # Set to 30 if your jobs are short and you'd rather take retries on rollouts.
+  terminationGracePeriodSeconds: 120
+  preStop:
+    enabled: false
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# -----------------------------------------------------------------------------
+# Scheduler role — long-running `schedule:work`, never more than 1 replica
+# -----------------------------------------------------------------------------
+scheduler:
+  enabled: true
+  containerRole: scheduler
+  command: ["php", "artisan", "schedule:work"]
+  args: []
+  env: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  livenessProbe:
+    exec:
+      command: ["pgrep", "-f", "schedule:work"]
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe: {}
+  terminationGracePeriodSeconds: 60
+  preStop:
+    enabled: false
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# -----------------------------------------------------------------------------
+# Frontend role — separate static SPA deployment (e.g. Vue + nginx)
+# -----------------------------------------------------------------------------
+frontend:
+  enabled: false
+  replicas: 2
+  image:
+    repository: ""
+    tag: ""           # falls back to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+  port: 80
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+  livenessProbe:
+    httpGet: { path: /, port: 80 }
+    initialDelaySeconds: 10
+    periodSeconds: 30
+  readinessProbe:
+    httpGet: { path: /, port: 80 }
+    initialDelaySeconds: 3
+    periodSeconds: 10
+  preStop:
+    enabled: true
+    sleepSeconds: 5
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+  pdb:
+    enabled: true
+    minAvailable: 1
+  hpa:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 4
+    cpuTargetPercent: 70
+
+# -----------------------------------------------------------------------------
+# Ingress (Traefik + cert-manager)
+# -----------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: traefik
+  certIssuer: letsencrypt-prod
+  # All hostnames share one cert. Add www.* variants here too if you want the
+  # redirect middleware to handle them — see redirectWwwToNonWww below.
+  hosts:
+    - example.com
+  # Override secretName if you need to share a cert across releases.
+  tlsSecretName: ""
+  # Adds a Traefik Middleware that 301s www.* → non-www and wires it up via
+  # the standard ingress annotation. Requires the www hostnames to also be
+  # listed in `hosts` so they have a valid TLS handshake to redirect from.
+  redirectWwwToNonWww: false
+  # Extra annotations merged onto the Ingress resource.
+  annotations: {}
+  # Path defaults to "/" with Prefix matching. Override if you need to split.
+  path: /
+  pathType: Prefix
+  # Routes the frontend on a separate hostname when frontend.enabled = true.
+  # Leave empty to skip frontend ingress (useful when frontend is served via
+  # the API ingress or hosted elsewhere).
+  frontendHosts: []
